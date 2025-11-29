@@ -1,38 +1,83 @@
-name: Build iOS dylib
+name: Build GDPS Proxy Dylib
 
-on: [push]
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+  workflow_dispatch:
 
 jobs:
   build:
-    runs-on: macos-13
+    runs-on: macos-latest
+    
     steps:
-    - uses: actions/checkout@v4
-
-    - name: Build iOS dylib (fat)
+    - name: Checkout code
+      uses: actions/checkout@v3
+    
+    - name: Download iOS 9.3 SDK
       run: |
-        SDK=$(xcrun --sdk iphoneos --show-sdk-path)
-
-        echo THE SDK IS CALLED $SDK
+        curl -L -o iPhoneOS9.3.sdk.zip https://github.com/xybp888/iOS-SDKs/releases/download/iOS-SDKs/iPhoneOS9.3.sdk.zip
+        unzip iPhoneOS9.3.sdk.zip
+        sudo mkdir -p /Applications/Xcode.app/Contents/Developer/Platforms/iPhoneOS.platform/Developer/SDKs/
+        sudo mv iPhoneOS9.3.sdk /Applications/Xcode.app/Contents/Developer/Platforms/iPhoneOS.platform/Developer/SDKs/
     
-        clang -arch armv7   -isysroot "$SDK" -miphoneos-version-min=9.0 \
-          -framework Foundation -framework Security \
-          -c gdproxy.m -o gdproxy-armv7.o
+    - name: Install libcurl for iOS
+      run: |
+        # Download prebuilt libcurl or build from source
+        git clone https://github.com/gcesarmza/curl-android-ios.git
+        cd curl-android-ios
+        ./build.sh
+        cd ..
     
-        clang -arch arm64   -isysroot "$SDK" -miphoneos-version-min=9.0 \
-          -framework Foundation -framework Security \
-          -c gdproxy.m -o gdproxy-arm64.o
-    
-        clang -arch armv7 -arch arm64 \
-          -isysroot "$SDK" \
+    - name: Build armv7 (32-bit)
+      run: |
+        xcrun -sdk iphoneos9.3 clang -arch armv7 \
+          -isysroot /Applications/Xcode.app/Contents/Developer/Platforms/iPhoneOS.platform/Developer/SDKs/iPhoneOS9.3.sdk \
+          -miphoneos-version-min=5.0 \
           -dynamiclib \
-          gdproxy-armv7.o gdproxy-arm64.o \
-          -o libgdproxy.dylib
+          -o gdps_proxy_armv7.dylib \
+          gdps_proxy.c \
+          -lcurl \
+          -framework Security \
+          -framework CoreFoundation \
+          -L./curl-android-ios/prebuilt-with-ssl/ios/lib \
+          -I./curl-android-ios/prebuilt-with-ssl/ios/include
     
-        codesign -f -s - libgdproxy.dylib
-
-
+    - name: Build arm64 (64-bit)
+      run: |
+        xcrun -sdk iphoneos9.3 clang -arch arm64 \
+          -isysroot /Applications/Xcode.app/Contents/Developer/Platforms/iPhoneOS.platform/Developer/SDKs/iPhoneOS9.3.sdk \
+          -miphoneos-version-min=5.0 \
+          -dynamiclib \
+          -o gdps_proxy_arm64.dylib \
+          gdps_proxy.c \
+          -lcurl \
+          -framework Security \
+          -framework CoreFoundation \
+          -L./curl-android-ios/prebuilt-with-ssl/ios/lib \
+          -I./curl-android-ios/prebuilt-with-ssl/ios/include
+    
+    - name: Create FAT binary
+      run: |
+        lipo -create \
+          gdps_proxy_armv7.dylib \
+          gdps_proxy_arm64.dylib \
+          -output gdps_proxy.dylib
+        
+        # Verify it's a FAT binary
+        lipo -info gdps_proxy.dylib
+        file gdps_proxy.dylib
+    
+    - name: Code sign (optional, for testing)
+      run: |
+        codesign -f -s - gdps_proxy.dylib || true
+    
     - name: Upload artifact
-      uses: actions/upload-artifact@v4
+      uses: actions/upload-artifact@v3
       with:
-        name: libgdproxy.dylib
-        path: libgdproxy.dylib
+        name: gdps-proxy-dylib
+        path: |
+          gdps_proxy.dylib
+          gdps_proxy_armv7.dylib
+          gdps_proxy_arm64.dylib
