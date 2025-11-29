@@ -1,55 +1,19 @@
-name: Build iOS armv7 dylib
+name: Build iOS dylib
 
-on:
-  push:
-    branches: [ main ]
-  pull_request:
+on: [push]
 
 jobs:
   build:
-    runs-on: ubuntu-latest
-
+    runs-on: macos-13
     steps:
     - uses: actions/checkout@v4
 
-    - name: Install dependencies
-      run: |
-        sudo apt update
-        sudo apt install -y \
-          clang cmake make python3 perl \
-          libssl-dev libxml2-dev pkg-config \
-          bison flex texinfo unzip cpio
-
-    - name: Clone osxcross
-      run: |
-        git clone https://github.com/tpoechtrager/osxcross.git
-
-    - name: Add iPhoneOS9.3 SDK + fake MacOSX SDK
-      run: |
-        cd osxcross
-        mkdir -p tarballs
-        wget -q https://github.com/xybp888/iOS-SDKs/releases/download/iOS-SDKs/iPhoneOS9.3.sdk.zip
-        unzip -q iPhoneOS9.3.sdk.zip
-        mv iPhoneOS9.3.sdk tarballs/
-
-        # ---- Fake macOS SDK workaround ----
-        mkdir -p tarballs/MacOSX10.11.sdk/usr/include
-        touch tarballs/MacOSX10.11.sdk/usr/include/stdio.h
-
-    - name: Build osxcross toolchain
-      run: |
-        cd osxcross
-        UNATTENDED=1 ./build.sh
-
     - name: Build dylib
       run: |
-        export PATH="$HOME/osxcross/target/bin:$PATH"
-        export OSXCROSS_TOP="$HOME/osxcross"
-        SYSROOT="$OSXCROSS_TOP/target/SDK/iPhoneOS9.3.sdk"
-
-        o64-clang \
+        SDK=$(xcrun --sdk iphoneos --show-sdk-path)
+        clang \
           -arch armv7 \
-          -isysroot "$SYSROOT" \
+          -isysroot "$SDK" \
           -miphoneos-version-min=5.0 \
           -framework Foundation \
           -framework Security \
@@ -59,5 +23,5 @@ jobs:
     - name: Upload artifact
       uses: actions/upload-artifact@v4
       with:
-        name: gdproxy-armv7
+        name: libgdproxy.dylib
         path: libgdproxy.dylib
