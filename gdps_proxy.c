@@ -10,8 +10,9 @@
 #include <netdb.h>
 #include <CommonCrypto/CommonDigest.h>
 #include <CoreFoundation/CoreFoundation.h>
+#include <CFNetwork/CFNetwork.h>
 
-#define PORT 3000
+#define PORT 7777
 #define BUFFER_SIZE 65536
 #define GDPS_URL "https://gdps.dimisaio.be/database/"
 #define DATA_FILE "/var/mobile/Documents/gdps_data.txt"
