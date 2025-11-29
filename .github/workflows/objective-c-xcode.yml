@@ -15,39 +15,43 @@ jobs:
     - name: Checkout code
       uses: actions/checkout@v4
     
-    - name: Download iOS 9.3 SDK
+    - name: Download curl headers
       run: |
-        curl -L -o iPhoneOS9.3.sdk.zip https://github.com/xybp888/iOS-SDKs/releases/download/iOS-SDKs/iPhoneOS9.3.sdk.zip
-        unzip iPhoneOS9.3.sdk.zip
-        sudo mv iPhoneOS9.3.sdk /tmp/
+        # Download curl source for headers only
+        curl -L -o curl.tar.gz https://curl.se/download/curl-7.88.1.tar.gz
+        tar -xzf curl.tar.gz
+        mkdir -p /tmp/curl-headers
+        cp -r curl-7.88.1/include/curl /tmp/curl-headers/
     
     - name: Build armv7 (32-bit)
       run: |
-        /Applications/Xcode.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/bin/clang \
+        clang \
           -arch armv7 \
-          -isysroot /tmp/iPhoneOS9.3.sdk \
           -miphoneos-version-min=5.0 \
           -dynamiclib \
           -o gdps_proxy_armv7.dylib \
           gdps_proxy.c \
+          -I/tmp/curl-headers \
           -lcurl \
           -framework Security \
           -framework CoreFoundation \
-          -F/tmp/iPhoneOS9.3.sdk/System/Library/Frameworks
+          -isysroot $(xcrun --sdk iphoneos --show-sdk-path) \
+          -target armv7-apple-ios5.0
     
     - name: Build arm64 (64-bit)
       run: |
-        /Applications/Xcode.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/bin/clang \
+        clang \
           -arch arm64 \
-          -isysroot /tmp/iPhoneOS9.3.sdk \
           -miphoneos-version-min=5.0 \
           -dynamiclib \
           -o gdps_proxy_arm64.dylib \
           gdps_proxy.c \
+          -I/tmp/curl-headers \
           -lcurl \
           -framework Security \
           -framework CoreFoundation \
-          -F/tmp/iPhoneOS9.3.sdk/System/Library/Frameworks
+          -isysroot $(xcrun --sdk iphoneos --show-sdk-path) \
+          -target arm64-apple-ios5.0
     
     - name: Create FAT binary
       run: |
