@@ -12,30 +12,28 @@ jobs:
 
     steps:
     - name: Checkout repo
-      uses: actions/checkout@v3
+      uses: actions/checkout@v4
 
-    - name: Set up Xcode
-      run: |
-        echo "Using Xcode version:"
-        xcodebuild -version
+    - name: Show Xcode version
+      run: xcodebuild -version
 
     - name: Compile gdproxy.m into dylib
       run: |
         SDK=$(xcrun --sdk iphoneos --show-sdk-path)
-        clang -isysroot $SDK \
-              -arch armv7 \
-              -mios-version-min=5.0 \
-              -framework Foundation \
-              -framework Security \
-              -dynamiclib gdproxy.m \
-              -o libgdproxy.dylib
+        clang gdproxy.m \
+            -isysroot "$SDK" \
+            -arch armv7 \
+            -mios-version-min=5.0 \
+            -framework Foundation \
+            -framework Security \
+            -dynamiclib \
+            -o libgdproxy.dylib
 
-    - name: Verify dylib
-      run: |
-        file libgdproxy.dylib
+    - name: Verify output
+      run: file libgdproxy.dylib
 
     - name: Upload artifact
-      uses: actions/upload-artifact@v3
+      uses: actions/upload-artifact@v4
       with:
         name: gdproxy-dylib
         path: libgdproxy.dylib
