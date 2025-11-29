@@ -10,34 +10,44 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-    - name: Checkout
-      uses: actions/checkout@v4
+    - uses: actions/checkout@v4
 
-    - name: Install build deps
+    - name: Install required packages
       run: |
         sudo apt update
-        sudo apt install -y cmake clang make perl python3 git unzip cpio libxml2-dev
+        sudo apt install -y \
+          clang cmake make python3 perl \
+          libssl-dev libxml2-dev pkg-config \
+          bison flex texinfo unzip cpio
 
-    - name: Install osxcross
+    - name: Clone osxcross
       run: |
         git clone https://github.com/tpoechtrager/osxcross.git
+
+    - name: Install iPhoneOS9.3 SDK
+      run: |
         cd osxcross
         mkdir -p tarballs
         wget -q https://github.com/xybp888/iOS-SDKs/releases/download/iOS-SDKs/iPhoneOS9.3.sdk.zip
         unzip -q iPhoneOS9.3.sdk.zip
         mv iPhoneOS9.3.sdk tarballs/
-        touch tarballs/iPhoneOSX.sdk.tar.xz   # fake macOS SDK to satisfy bootstrap
-        UNATTENDED=1 ./tools/get_dependencies.sh
-        UNATTENDED=1 ./build.sh
+        # Fake a macOS SDK to satisfy checks
+        touch tarballs/MacOSX10.11.sdk.tar.xz
+
+    - name: Build osxcross toolchain
+      run: |
+        cd osxcross
+        UNATTENDED=yes SDK_VERSION=9.3 ./build.sh
 
     - name: Build dylib
       run: |
         export PATH="$HOME/osxcross/target/bin:$PATH"
-        export SDK=iphoneos9.3
+        export OSXCROSS_TOP="$HOME/osxcross"
+        SYSROOT="$OSXCROSS_TOP/target/SDK/iPhoneOS9.3.sdk"
 
         o64-clang \
           -arch armv7 \
-          -isysroot $OSXCROSS_TOP/target/SDK/$SDK.sdk \
+          -isysroot "$SYSROOT" \
           -miphoneos-version-min=5.0 \
           -framework Foundation \
           -framework Security \
