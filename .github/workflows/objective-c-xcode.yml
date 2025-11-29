@@ -23,19 +23,13 @@ jobs:
         sudo mv iPhoneOS9.3.sdk /Applications/Xcode.app/Contents/Developer/Platforms/iPhoneOS.platform/Developer/SDKs/
     
     - name: Build libcurl for iOS using build-libcurl-ios
-      run: |
-        # Clone the build script repo
-        git clone https://github.com/sinofool/build-libcurl-ios.git
-        cd build-libcurl-ios
-        
+      run: |        
         # Modify the script to use our iOS 9.3 SDK
         sed -i '' 's|iPhoneOS.sdk|iPhoneOS9.3.sdk|g' libcurl.sh
         
         # Run the build script with OpenSSL support
-        ./libcurl.sh
-        
-        cd ..
-        
+        curl https://raw.githubusercontent.com/sinofool/build-libcurl-ios/master/build_libcurl_dist.sh openssl |bash
+                
         # Copy the built libraries to expected locations
         mkdir -p curl/armv7/lib curl/armv7/include
         mkdir -p curl/arm64/lib curl/arm64/include
