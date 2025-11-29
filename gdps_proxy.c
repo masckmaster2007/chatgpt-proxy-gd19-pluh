@@ -1,6 +1,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <ctype.h>
 #include <pthread.h>
 #include <unistd.h>
 #include <sys/socket.h>
@@ -9,9 +10,9 @@
 #include <CommonCrypto/CommonDigest.h>
 #include <curl/curl.h>
 
-#define PORT 3000
+#define PORT 7777
 #define BUFFER_SIZE 65536
-#define GDPS_URL "https://gdps.dimisaio.be/database"
+#define GDPS_URL "https://gdps.dimisaio.be/database/"
 #define DATA_FILE "/var/mobile/Documents/gdps_data.txt"
 
 typedef struct {
@@ -20,6 +21,9 @@ typedef struct {
 } ResponseData;
 
 static char cached_gjp2[64] = {0};
+
+// Forward declaration
+void* server_main(void *arg);
 
 // SHA1 hash function for GJP2
 void compute_gjp2(const char *password, char *output) {
