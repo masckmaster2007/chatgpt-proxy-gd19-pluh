@@ -7,18 +7,14 @@
 #include <sys/socket.h>
 #include <netinet/in.h>
 #include <arpa/inet.h>
+#include <netdb.h>
 #include <CommonCrypto/CommonDigest.h>
-#include <curl/curl.h>
+#include <CoreFoundation/CoreFoundation.h>
 
-#define PORT 7777
+#define PORT 3000
 #define BUFFER_SIZE 65536
 #define GDPS_URL "https://gdps.dimisaio.be/database/"
 #define DATA_FILE "/var/mobile/Documents/gdps_data.txt"
-
-typedef struct {
-    char *data;
-    size_t size;
-} ResponseData;
 
 static char cached_gjp2[64] = {0};
 
@@ -60,48 +56,23 @@ void save_gjp2(const char *gjp2) {
     }
 }
 
-// CURL write callback
-size_t write_callback(void *contents, size_t size, size_t nmemb, void *userp) {
-    size_t realsize = size * nmemb;
-    ResponseData *mem = (ResponseData *)userp;
+// URL encode helper
+void url_encode(const char *src, char *dst, size_t dst_size) {
+    const char *hex = "0123456789ABCDEF";
+    size_t pos = 0;
     
-    char *ptr = realloc(mem->data, mem->size + realsize + 1);
-    if (!ptr) return 0;
-    
-    mem->data = ptr;
-    memcpy(&(mem->data[mem->size]), contents, realsize);
-    mem->size += realsize;
-    mem->data[mem->size] = 0;
-    
-    return realsize;
-}
-
-// Perform POST request
-char* post_request(const char *url, const char *postdata) {
-    CURL *curl = curl_easy_init();
-    if (!curl) return NULL;
-    
-    ResponseData response = {0};
-    response.data = malloc(1);
-    response.size = 0;
-    
-    curl_easy_setopt(curl, CURLOPT_URL, url);
-    curl_easy_setopt(curl, CURLOPT_POSTFIELDS, postdata);
-    curl_easy_setopt(curl, CURLOPT_WRITEFUNCTION, write_callback);
-    curl_easy_setopt(curl, CURLOPT_WRITEDATA, (void *)&response);
-    curl_easy_setopt(curl, CURLOPT_SSL_VERIFYPEER, 0L);
-    curl_easy_setopt(curl, CURLOPT_SSL_VERIFYHOST, 0L);
-    curl_easy_setopt(curl, CURLOPT_FOLLOWLOCATION, 1L);
-    
-    CURLcode res = curl_easy_perform(curl);
-    curl_easy_cleanup(curl);
-    
-    if (res != CURLE_OK) {
-        free(response.data);
-        return NULL;
+    for (; *src && pos < dst_size - 4; src++) {
+        if (isalnum(*src) || *src == '-' || *src == '_' || *src == '.' || *src == '~') {
+            dst[pos++] = *src;
+        } else if (*src == ' ') {
+            dst[pos++] = '+';
+        } else {
+            dst[pos++] = '%';
+            dst[pos++] = hex[(*src >> 4) & 0xF];
+            dst[pos++] = hex[*src & 0xF];
+        }
     }
-    
-    return response.data;
+    dst[pos] = '\0';
 }
 
 // URL decode helper
@@ -149,6 +120,76 @@ char* extract_param(const char *data, const char *key) {
     return decoded;
 }
 
+// Simple HTTPS POST using CFNetwork
+char* https_post(const char *url, const char *post_data) {
+    CFStringRef urlString = CFStringCreateWithCString(NULL, url, kCFStringEncodingUTF8);
+    CFURLRef cfUrl = CFURLCreateWithString(NULL, urlString, NULL);
+    CFRelease(urlString);
+    
+    if (!cfUrl) return strdup("-1");
+    
+    // Create request
+    CFStringRef method = CFSTR("POST");
+    CFHTTPMessageRef request = CFHTTPMessageCreateRequest(NULL, method, cfUrl, kCFHTTPVersion1_1);
+    CFRelease(cfUrl);
+    
+    if (!request) return strdup("-1");
+    
+    // Set headers
+    CFStringRef contentType = CFSTR("application/x-www-form-urlencoded");
+    CFHTTPMessageSetHeaderFieldValue(request, CFSTR("Content-Type"), contentType);
+    
+    // Set body
+    CFDataRef bodyData = CFDataCreate(NULL, (const UInt8*)post_data, strlen(post_data));
+    CFHTTPMessageSetBody(request, bodyData);
+    CFRelease(bodyData);
+    
+    // Create read stream
+    CFReadStreamRef readStream = CFReadStreamCreateForHTTPRequest(NULL, request);
+    CFRelease(request);
+    
+    if (!readStream) return strdup("-1");
+    
+    // Enable automatic redirect and SSL
+    CFReadStreamSetProperty(readStream, kCFStreamPropertyHTTPShouldAutoredirect, kCFBooleanTrue);
+    
+    // Open stream
+    if (!CFReadStreamOpen(readStream)) {
+        CFRelease(readStream);
+        return strdup("-1");
+    }
+    
+    // Read response
+    CFMutableDataRef responseData = CFDataCreateMutable(NULL, 0);
+    UInt8 buffer[8192];
+    CFIndex bytesRead;
+    
+    while ((bytesRead = CFReadStreamRead(readStream, buffer, sizeof(buffer))) > 0) {
+        CFDataAppendBytes(responseData, buffer, bytesRead);
+    }
+    
+    CFReadStreamClose(readStream);
+    CFRelease(readStream);
+    
+    // Convert to C string
+    CFIndex length = CFDataGetLength(responseData);
+    char *result = malloc(length + 1);
+    CFDataGetBytes(responseData, CFRangeMake(0, length), (UInt8*)result);
+    result[length] = '\0';
+    CFRelease(responseData);
+    
+    // Extract body from HTTP response
+    char *body = strstr(result, "\r\n\r\n");
+    if (body) {
+        body += 4;
+        char *final = strdup(body);
+        free(result);
+        return final;
+    }
+    
+    return result;
+}
+
 // Handle client connection
 void* handle_client(void *arg) {
     int client_sock = *(int*)arg;
@@ -172,7 +213,7 @@ void* handle_client(void *arg) {
     
     // Build full URL
     char full_url[1024];
-    snprintf(full_url, sizeof(full_url), "%s%s", GDPS_URL, path + 1);
+    snprintf(full_url, sizeof(full_url), "%s%s", GDPS_URL, path + 1); // +1 to skip leading /
     
     // Add GJP2 if accountID is present
     char modified_post[BUFFER_SIZE];
@@ -193,7 +234,7 @@ void* handle_client(void *arg) {
     }
     
     // Make request
-    char *response_body = post_request(full_url, modified_post);
+    char *response_body = https_post(full_url, modified_post);
     if (!response_body) response_body = strdup("-1");
     
     // Send HTTP response
@@ -216,12 +257,11 @@ void* handle_client(void *arg) {
 __attribute__((constructor))
 static void start_server() {
     pthread_t thread;
-    pthread_create(&thread, NULL, (void*)server_main, NULL);
+    pthread_create(&thread, NULL, server_main, NULL);
     pthread_detach(thread);
 }
 
 void* server_main(void *arg) {
-    curl_global_init(CURL_GLOBAL_ALL);
     load_cached_gjp2();
     
     int server_sock = socket(AF_INET, SOCK_STREAM, 0);
