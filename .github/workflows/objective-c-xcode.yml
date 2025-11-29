@@ -1,0 +1,41 @@
+name: Build iOS dylib
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+
+jobs:
+  build:
+    name: Build gdproxy dylib
+    runs-on: macos-latest
+
+    steps:
+    - name: Checkout repo
+      uses: actions/checkout@v3
+
+    - name: Set up Xcode
+      run: |
+        echo "Using Xcode version:"
+        xcodebuild -version
+
+    - name: Compile gdproxy.m into dylib
+      run: |
+        SDK=$(xcrun --sdk iphoneos --show-sdk-path)
+        clang -isysroot $SDK \
+              -arch armv7 \
+              -mios-version-min=5.0 \
+              -framework Foundation \
+              -framework Security \
+              -dynamiclib gdproxy.m \
+              -o libgdproxy.dylib
+
+    - name: Verify dylib
+      run: |
+        file libgdproxy.dylib
+
+    - name: Upload artifact
+      uses: actions/upload-artifact@v3
+      with:
+        name: gdproxy-dylib
+        path: libgdproxy.dylib
