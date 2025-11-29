@@ -12,7 +12,7 @@ jobs:
     steps:
     - uses: actions/checkout@v4
 
-    - name: Install required packages
+    - name: Install dependencies
       run: |
         sudo apt update
         sudo apt install -y \
@@ -24,20 +24,22 @@ jobs:
       run: |
         git clone https://github.com/tpoechtrager/osxcross.git
 
-    - name: Install iPhoneOS9.3 SDK
+    - name: Add iPhoneOS9.3 SDK + fake MacOSX SDK
       run: |
         cd osxcross
         mkdir -p tarballs
         wget -q https://github.com/xybp888/iOS-SDKs/releases/download/iOS-SDKs/iPhoneOS9.3.sdk.zip
         unzip -q iPhoneOS9.3.sdk.zip
         mv iPhoneOS9.3.sdk tarballs/
-        # Fake a macOS SDK to satisfy checks
-        touch tarballs/MacOSX10.11.sdk.tar.xz
+
+        # ---- Fake macOS SDK workaround ----
+        mkdir -p tarballs/MacOSX10.11.sdk/usr/include
+        touch tarballs/MacOSX10.11.sdk/usr/include/stdio.h
 
     - name: Build osxcross toolchain
       run: |
         cd osxcross
-        UNATTENDED=yes SDK_VERSION=9.3 ./build.sh
+        UNATTENDED=1 ./build.sh
 
     - name: Build dylib
       run: |
