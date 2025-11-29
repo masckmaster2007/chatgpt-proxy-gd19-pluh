@@ -15,22 +15,6 @@ jobs:
     - name: Checkout code
       uses: actions/checkout@v4
     
-    - name: Download curl headers
-      run: |
-        # Download curl source for headers only
-        curl -L -o curl.tar.gz https://curl.se/download/curl-7.88.1.tar.gz
-        tar -xzf curl.tar.gz
-        mkdir -p /tmp/curl-headers
-        cp -r curl-7.88.1/include/curl /tmp/curl-headers/
-    
-    - name: Download prebuilt libcurl for iOS
-      run: |
-        # Use prebuilt libcurl from a reliable source
-        git clone --depth 1 https://github.com/gcesarmza/curl-android-ios.git
-        # The prebuilt version should be in prebuilt-with-ssl/ios/
-        ls -la curl-android-ios/prebuilt-with-ssl/ios/ || echo "Checking structure..."
-        find curl-android-ios -name "libcurl.a" -type f
-    
     - name: Build armv7 (32-bit)
       run: |
         clang \
@@ -39,8 +23,6 @@ jobs:
           -dynamiclib \
           -o gdps_proxy_armv7.dylib \
           gdps_proxy.c \
-          -I/tmp/curl-headers \
-          curl-android-ios/prebuilt-with-ssl/ios/libcurl_iOS_armv7.a \
           -framework Security \
           -framework CoreFoundation \
           -isysroot $(xcrun --sdk iphoneos --show-sdk-path) \
@@ -54,8 +36,6 @@ jobs:
           -dynamiclib \
           -o gdps_proxy_arm64.dylib \
           gdps_proxy.c \
-          -I/tmp/curl-headers \
-          curl-android-ios/prebuilt-with-ssl/ios/libcurl_iOS_arm64.a \
           -framework Security \
           -framework CoreFoundation \
           -isysroot $(xcrun --sdk iphoneos --show-sdk-path) \
