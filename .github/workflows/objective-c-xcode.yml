@@ -26,9 +26,9 @@ jobs:
       run: |
         # Download prebuilt libcurl or build from source
         git clone https://github.com/gcesarmza/curl-android-ios.git
-        cd curl-android-ios
-        ./build.sh
-        cd ..
+        cd curl-android-ios/curl-compile-scripts
+        ./build_iOS.sh
+        cd ../..
     
     - name: Build armv7 (32-bit)
       run: |
