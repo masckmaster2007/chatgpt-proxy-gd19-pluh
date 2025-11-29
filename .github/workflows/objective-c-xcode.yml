@@ -25,6 +25,7 @@ jobs:
           gdps_proxy.c \
           -framework Security \
           -framework CoreFoundation \
+          -framework CFNetwork \
           -isysroot $(xcrun --sdk iphoneos --show-sdk-path) \
           -target armv7-apple-ios5.0
     
@@ -38,6 +39,7 @@ jobs:
           gdps_proxy.c \
           -framework Security \
           -framework CoreFoundation \
+          -framework CFNetwork \
           -isysroot $(xcrun --sdk iphoneos --show-sdk-path) \
           -target arm64-apple-ios5.0
     
