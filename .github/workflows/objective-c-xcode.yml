@@ -13,7 +13,7 @@ jobs:
     
     steps:
     - name: Checkout code
-      uses: actions/checkout@v3
+      uses: actions/checkout@v4
     
     - name: Download iOS 9.3 SDK
       run: |
@@ -74,10 +74,21 @@ jobs:
         codesign -f -s - gdps_proxy.dylib || true
     
     - name: Upload artifact
-      uses: actions/upload-artifact@v3
+      uses: actions/upload-artifact@v4
       with:
         name: gdps-proxy-dylib
         path: |
           gdps_proxy.dylib
           gdps_proxy_armv7.dylib
           gdps_proxy_arm64.dylib
+    
+    - name: Create Release (on tag)
+      if: startsWith(github.ref, 'refs/tags/')
+      uses: softprops/action-gh-release@v1
+      with:
+        files: |
+          gdps_proxy.dylib
+          gdps_proxy_armv7.dylib
+          gdps_proxy_arm64.dylib
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
