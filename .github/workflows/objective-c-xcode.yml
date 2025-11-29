@@ -22,35 +22,33 @@ jobs:
         sudo mkdir -p /Applications/Xcode.app/Contents/Developer/Platforms/iPhoneOS.platform/Developer/SDKs/
         sudo mv iPhoneOS9.3.sdk /Applications/Xcode.app/Contents/Developer/Platforms/iPhoneOS.platform/Developer/SDKs/
     
-    - name: Install build dependencies
+    - name: Build libcurl for iOS using build-libcurl-ios
       run: |
-        brew install autoconf automake libtool
-    
-    - name: Build libcurl for iOS
-      run: |
-        # Clone curl source
-        git clone https://github.com/curl/curl.git
-        cd curl
-        git checkout curl-8_4_0
+        # Clone the build script repo
+        git clone https://github.com/sinofool/build-libcurl-ios.git
+        cd build-libcurl-ios
         
-        # Build for armv7
-        ./buildconf
-        export SDKROOT="/Applications/Xcode.app/Contents/Developer/Platforms/iPhoneOS.platform/Developer/SDKs/iPhoneOS9.3.sdk"
-        export CFLAGS="-arch armv7 -isysroot $SDKROOT -miphoneos-version-min=5.0"
-        export LDFLAGS="-arch armv7 -isysroot $SDKROOT"
-        ./configure --host=arm-apple-darwin --prefix=$PWD/armv7 --enable-static --disable-shared --with-secure-transport
-        make -j$(sysctl -n hw.ncpu)
-        make install
-        make clean
+        # Modify the script to use our iOS 9.3 SDK
+        sed -i '' 's|iPhoneOS.sdk|iPhoneOS9.3.sdk|g' libcurl.sh
         
-        # Build for arm64
-        export CFLAGS="-arch arm64 -isysroot $SDKROOT -miphoneos-version-min=5.0"
-        export LDFLAGS="-arch arm64 -isysroot $SDKROOT"
-        ./configure --host=aarch64-apple-darwin --prefix=$PWD/arm64 --enable-static --disable-shared --with-secure-transport
-        make -j$(sysctl -n hw.ncpu)
-        make install
+        # Run the build script with OpenSSL support
+        ./libcurl.sh
         
         cd ..
+        
+        # Copy the built libraries to expected locations
+        mkdir -p curl/armv7/lib curl/armv7/include
+        mkdir -p curl/arm64/lib curl/arm64/include
+        
+        # Extract armv7 and arm64 from the FAT binary
+        cd build-libcurl-ios/lib
+        lipo libcurl.a -thin armv7 -output ../../curl/armv7/lib/libcurl.a
+        lipo libcurl.a -thin arm64 -output ../../curl/arm64/lib/libcurl.a
+        cd ../..
+        
+        # Copy headers
+        cp -r build-libcurl-ios/include/curl curl/armv7/include/
+        cp -r build-libcurl-ios/include/curl curl/arm64/include/
     
     - name: Build armv7 (32-bit)
       run: |
