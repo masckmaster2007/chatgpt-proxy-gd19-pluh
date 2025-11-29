@@ -22,27 +22,6 @@ jobs:
         sudo mkdir -p /Applications/Xcode.app/Contents/Developer/Platforms/iPhoneOS.platform/Developer/SDKs/
         sudo mv iPhoneOS9.3.sdk /Applications/Xcode.app/Contents/Developer/Platforms/iPhoneOS.platform/Developer/SDKs/
     
-    - name: Build libcurl for iOS using build-libcurl-ios
-      run: |        
-        # Run the build script with OpenSSL support
-        wget https://raw.githubusercontent.com/sinofool/build-libcurl-ios/master/build_libcurl_dist.sh
-        sed -i '' 's|iPhoneOS.sdk|iPhoneOS9.3.sdk|g' build_libcurl_dist.sh
-        bash build_libcurl_dist.sh openssl
-                
-        # Copy the built libraries to expected locations
-        mkdir -p curl/armv7/lib curl/armv7/include
-        mkdir -p curl/arm64/lib curl/arm64/include
-        
-        # Extract armv7 and arm64 from the FAT binary
-        cd build-libcurl-ios/lib
-        lipo libcurl.a -thin armv7 -output ../../curl/armv7/lib/libcurl.a
-        lipo libcurl.a -thin arm64 -output ../../curl/arm64/lib/libcurl.a
-        cd ../..
-        
-        # Copy headers
-        cp -r build-libcurl-ios/include/curl curl/armv7/include/
-        cp -r build-libcurl-ios/include/curl curl/arm64/include/
-    
     - name: Build armv7 (32-bit)
       run: |
         xcrun -sdk iphoneos9.3 clang -arch armv7 \
@@ -51,10 +30,9 @@ jobs:
           -dynamiclib \
           -o gdps_proxy_armv7.dylib \
           gdps_proxy.c \
+          -lcurl \
           -framework Security \
-          -framework CoreFoundation \
-          -I./curl/armv7/include \
-          ./curl/armv7/lib/libcurl.a
+          -framework CoreFoundation
     
     - name: Build arm64 (64-bit)
       run: |
@@ -64,10 +42,9 @@ jobs:
           -dynamiclib \
           -o gdps_proxy_arm64.dylib \
           gdps_proxy.c \
+          -lcurl \
           -framework Security \
-          -framework CoreFoundation \
-          -I./curl/arm64/include \
-          ./curl/arm64/lib/libcurl.a
+          -framework CoreFoundation
     
     - name: Create FAT binary
       run: |
