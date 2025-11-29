@@ -15,6 +15,12 @@ jobs:
     - name: Checkout code
       uses: actions/checkout@v4
     
+    - name: Download iOS 9.3 SDK
+      run: |
+        curl -L -o iPhoneOS9.3.sdk.zip https://github.com/xybp888/iOS-SDKs/releases/download/iOS-SDKs/iPhoneOS9.3.sdk.zip
+        unzip iPhoneOS9.3.sdk.zip
+        sudo mv iPhoneOS9.3.sdk /tmp/iPhoneOS9.3.sdk
+    
     - name: Build armv7 (32-bit)
       run: |
         clang \
@@ -26,8 +32,10 @@ jobs:
           -framework Security \
           -framework CoreFoundation \
           -framework CFNetwork \
-          -isysroot $(xcrun --sdk iphoneos --show-sdk-path) \
-          -target armv7-apple-ios5.0
+          -isysroot /tmp/iPhoneOS9.3.sdk \
+          -F/tmp/iPhoneOS9.3.sdk/System/Library/Frameworks \
+          -L/tmp/iPhoneOS9.3.sdk/usr/lib \
+          -Wl,-syslibroot,/tmp/iPhoneOS9.3.sdk
     
     - name: Build arm64 (64-bit)
       run: |
@@ -40,8 +48,10 @@ jobs:
           -framework Security \
           -framework CoreFoundation \
           -framework CFNetwork \
-          -isysroot $(xcrun --sdk iphoneos --show-sdk-path) \
-          -target arm64-apple-ios5.0
+          -isysroot /tmp/iPhoneOS9.3.sdk \
+          -F/tmp/iPhoneOS9.3.sdk/System/Library/Frameworks \
+          -L/tmp/iPhoneOS9.3.sdk/usr/lib \
+          -Wl,-syslibroot,/tmp/iPhoneOS9.3.sdk
     
     - name: Create FAT binary
       run: |
