@@ -8,17 +8,28 @@ jobs:
     steps:
     - uses: actions/checkout@v4
 
-    - name: Build dylib
+    - name: Build iOS dylib (fat)
       run: |
         SDK=$(xcrun --sdk iphoneos --show-sdk-path)
-        clang \
-          -arch armv7 \
+
+        echo THE SDK IS CALLED $SDK
+    
+        clang -arch armv7   -isysroot "$SDK" -miphoneos-version-min=9.0 \
+          -framework Foundation -framework Security \
+          -c gdproxy.m -o gdproxy-armv7.o
+    
+        clang -arch arm64   -isysroot "$SDK" -miphoneos-version-min=9.0 \
+          -framework Foundation -framework Security \
+          -c gdproxy.m -o gdproxy-arm64.o
+    
+        clang -arch armv7 -arch arm64 \
           -isysroot "$SDK" \
-          -miphoneos-version-min=5.0 \
-          -framework Foundation \
-          -framework Security \
-          -dynamiclib gdproxy.m \
+          -dynamiclib \
+          gdproxy-armv7.o gdproxy-arm64.o \
           -o libgdproxy.dylib
+    
+        codesign -f -s - libgdproxy.dylib
+
 
     - name: Upload artifact
       uses: actions/upload-artifact@v4
