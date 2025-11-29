@@ -22,13 +22,35 @@ jobs:
         sudo mkdir -p /Applications/Xcode.app/Contents/Developer/Platforms/iPhoneOS.platform/Developer/SDKs/
         sudo mv iPhoneOS9.3.sdk /Applications/Xcode.app/Contents/Developer/Platforms/iPhoneOS.platform/Developer/SDKs/
     
-    - name: Install libcurl for iOS
+    - name: Install build dependencies
       run: |
-        # Download prebuilt libcurl or build from source
-        git clone https://github.com/gcesarmza/curl-android-ios.git
-        cd curl-android-ios/curl-compile-scripts
-        ./build_iOS.sh
-        cd ../..
+        brew install autoconf automake libtool
+    
+    - name: Build libcurl for iOS
+      run: |
+        # Clone curl source
+        git clone https://github.com/curl/curl.git
+        cd curl
+        git checkout curl-8_4_0
+        
+        # Build for armv7
+        ./buildconf
+        export SDKROOT="/Applications/Xcode.app/Contents/Developer/Platforms/iPhoneOS.platform/Developer/SDKs/iPhoneOS9.3.sdk"
+        export CFLAGS="-arch armv7 -isysroot $SDKROOT -miphoneos-version-min=5.0"
+        export LDFLAGS="-arch armv7 -isysroot $SDKROOT"
+        ./configure --host=arm-apple-darwin --prefix=$PWD/armv7 --enable-static --disable-shared --with-secure-transport
+        make -j$(sysctl -n hw.ncpu)
+        make install
+        make clean
+        
+        # Build for arm64
+        export CFLAGS="-arch arm64 -isysroot $SDKROOT -miphoneos-version-min=5.0"
+        export LDFLAGS="-arch arm64 -isysroot $SDKROOT"
+        ./configure --host=aarch64-apple-darwin --prefix=$PWD/arm64 --enable-static --disable-shared --with-secure-transport
+        make -j$(sysctl -n hw.ncpu)
+        make install
+        
+        cd ..
     
     - name: Build armv7 (32-bit)
       run: |
@@ -38,11 +60,10 @@ jobs:
           -dynamiclib \
           -o gdps_proxy_armv7.dylib \
           gdps_proxy.c \
-          -lcurl \
           -framework Security \
           -framework CoreFoundation \
-          -L./curl-android-ios/prebuilt-with-ssl/ios/lib \
-          -I./curl-android-ios/prebuilt-with-ssl/ios/include
+          -I./curl/armv7/include \
+          ./curl/armv7/lib/libcurl.a
     
     - name: Build arm64 (64-bit)
       run: |
@@ -52,11 +73,10 @@ jobs:
           -dynamiclib \
           -o gdps_proxy_arm64.dylib \
           gdps_proxy.c \
-          -lcurl \
           -framework Security \
           -framework CoreFoundation \
-          -L./curl-android-ios/prebuilt-with-ssl/ios/lib \
-          -I./curl-android-ios/prebuilt-with-ssl/ios/include
+          -I./curl/arm64/include \
+          ./curl/arm64/lib/libcurl.a
     
     - name: Create FAT binary
       run: |
