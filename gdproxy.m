@@ -33,7 +33,7 @@ NSString *GJP2(NSString *pass) {
 
 NSString *ForwardPOST(NSString *url, NSString *body) {
     NSURL *u = [NSURL URLWithString:
-        [@"https://gdps.dimisaio.be" stringByAppendingString:url]];
+        [@"https://gdps.dimisaio.be/database" stringByAppendingString:url]];
 
     NSMutableURLRequest *r = [NSMutableURLRequest requestWithURL:u];
     [r setHTTPMethod:@"POST"];
